@@ -1,25 +1,70 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+Activity Monitoring Data Overview
+========================================================
+
+This report summarizes several key features from two months of activity monitoring data, obtained by devices like fitbit.  
+
+This first code section simply downloads, reads, and processes the data with read.csv.
+```{r initiatedata, cache=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "zipped_activity_data.zip", method="curl")
+unzip("zipped_activity_data.zip")
+activity<-read.csv("activity.csv")
+
+```
+
+Now, we compute some basic information on steps per day.  First, we compute and output the total number of steps taken each day. Then we present a simple histogram of that data. Last, we output the mean and median number of steps per day.
+
+```{r steps_per_day}
+Steps_Per_Day<-tapply( activity$steps, activity$date,sum)
+Steps_Per_Day
+hist(Steps_Per_Day)
+mean(Steps_Per_Day,na.rm=TRUE)
+median(Steps_Per_Day,na.rm=TRUE)
+```
+
+Having shown some information on steps per day, we investigate steps per time interval.  Here we create a time series plot of average number of steps in each time interval.  Then we output the time interval with the highest number of steps.
+
+``` {r steps_per_interval}
+time_interval_means<-tapply(activity$steps,activity$interval,mean,na.rm=TRUE)
+time_interval_means<-as.data.frame(time_interval_means)
+plot(row.names(time_interval_means),time_interval_means$time_interval_means,type='l',xlab="Time Interval",ylab="Number of Steps",main="Average Steps in Each Time Interval")
+time_interval_sums<-tapply(activity$steps,activity$interval,sum,na.rm=TRUE)
+time_interval_sums<-as.data.frame(time_interval_sums)
+which.max(time_interval_sums$time_interval_sums)
+```
+
+Thus far, we have been simply removing missing values to handle the numerous NAs in the data.  Here, we devise a strategy for imputing that missing data.  We loop over the activity data, replacing missing step values with the mean steps for the time interval in which the missing value occered.  This simple method will have little effect on measures of central tendency, although it may effect more complex analyses like regression.  
+
+We then show some summary data, including a histogram of the data with the NAs replaced as above.  The totals in the histogram are higher (since there are more values) but the overall shape of the distribution, along with the median and mean, is virtually unchanged.
+
+``` {r missing_values}
+sum(is.na(activity$steps))
+activity_no_missing<-activity
+for (i in 1:length(activity$steps)){
+  if (is.na(activity$steps[i])){
+    activity_no_missing$steps[i]<-mean(subset(activity,activity$interval==activity$interval[i])$steps,na.rm=TRUE)
+  }
+}
+Steps_Per_Day<-tapply(activity_no_missing$steps, activity_no_missing$date,sum)
+Steps_Per_Day
+hist(Steps_Per_Day)
+mean(Steps_Per_Day,na.rm=TRUE)
+median(Steps_Per_Day,na.rm=TRUE)
+```
 
 
-## Loading and preprocessing the data
+Finally, we consider weekdays against weekends.  We create a new boolean factor variable for whether the day is a weekday.  We then create a 2-panel time series plot to compare steps per time interval on weekdays to steps per time interval on weekends.  
 
+``` {r weekdays}
+activity_no_missing$weekday=weekdays(as.Date(as.character(activity_no_missing$date),"%Y-%m-%d"))
+activity_no_missing$weekday<-!(activity_no_missing$weekday=="Saturday"|activity_no_missing$weekday=="Sunday")
+activity_no_missing$weekday<-as.factor(activity_no_missing$weekday)
+weekday_activity<-subset(activity_no_missing,activity_no_missing$weekday==TRUE)
+weekend_activity<-subset(activity_no_missing,activity_no_missing$weekday==FALSE)
+par(mfrow=c(2,1)) 
+time_interval_means<-tapply(weekday_activity$steps,weekday_activity$interval,mean,na.rm=TRUE)
+time_interval_means<-as.data.frame(time_interval_means)
+plot(row.names(time_interval_means),time_interval_means$time_interval_means,type='l',xlab="Time Interval",ylab="Number of Steps",main="Weekday")
 
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+time_interval_means<-tapply(weekend_activity$steps,weekend_activity$interval,mean,na.rm=TRUE)
+time_interval_means<-as.data.frame(time_interval_means)
+plot(row.names(time_interval_means),time_interval_means$time_interval_means,type='l',xlab="Time Interval",ylab="Number of Steps",main="Weekend")
